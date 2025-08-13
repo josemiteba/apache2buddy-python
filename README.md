@@ -1,116 +1,70 @@
-# Status
-[![Maintenance](https://img.shields.io/badge/Maintained%3F-yes-green.svg)](https://GitHub.com/richardforth/apache2buddy/graphs/commit-activity) [![GitHub latest commit](https://badgen.net/github/last-commit/richardforth/apache2buddy)](https://GitHub.com/richardforth/apache2buddy/commit/) [![GitHub stars](https://badgen.net/github/stars/richardforth/apache2buddy)](https://GitHub.com/richardforth/apache2buddy/stargazers/) [![Generic badge](https://img.shields.io/badge/Tests-Passing-green.svg)](https://shields.io/)
+# Apache2Buddy en Kubernetes
 
-# OS Support Staus
+Este proyecto es un fork de [richardforth/apache2buddy](https://github.com/richardforth/apache2buddy) (implementación original en Perl), convertido y adaptado a Python.
 
-## RedHat Family
+Este README explica cómo ejecutar apache2buddy.py en pods de Kubernetes para analizar el rendimiento de Apache.
 
-Red Hat is Licenced so I am unable to test it, but it is technically supported -  testing is done via OracleLinux, Rocky and Alma.
-Note that CentOS is now removed from support and no longer tested against, as it is deprecated, but you  can try with -O to skip OS os checks.
+## 📋 Requisitos Previos
+- **Root access (OBLIGATORIO)**: El script debe ejecutarse como usuario root para poder inspeccionar procesos, memoria y ficheros de Apache adecuadamente.
 
- [![Generic badge](https://img.shields.io/badge/RHEL-Unable%20To%20Test-red.svg)](https://shields.io/)
+### Ejecutar como root en Kubernetes
+- Si el contenedor no permite `kubectl exec` con root, puedes usar kpexec para obtener privilegios elevados sin SSH. Instálalo según su guía y ejecuta el comando dentro del pod objetivo.
+  - Proyecto: [ssup2/kpexec](https://github.com/ssup2/kpexec)
+  - Ejemplos:
+    ```bash
+    # Abrir una shell con herramientas dentro del mismo contenedor con privilegios altos
+    kpexec -it -T -n <namespace> <pod> -- bash
 
- [![Generic badge](https://img.shields.io/badge/Centos-Removed-red.svg)](https://shields.io/)
+    # Ejecutar el script directamente con herramientas (tools mode)
+    kpexec -it -T -n <namespace> <pod> -- python3 /path/apache2buddy.py --skip-os-version-check -p 8080
+    ```
 
- [![Generic badge](https://img.shields.io/badge/Oracle%20Linux%208-Passing-green.svg)](https://shields.io/)
- [![Generic badge](https://img.shields.io/badge/Oracle%20Linux%209-Passing-green.svg)](https://shields.io/)
-
- [![Generic badge](https://img.shields.io/badge/Rocky%20Linux%208-Passing-green.svg)](https://shields.io/)
- [![Generic badge](https://img.shields.io/badge/Rocky%20Linux%209-Passing-green.svg)](https://shields.io/)
-
- [![Generic badge](https://img.shields.io/badge/AlmaLinux%208-Passing-green.svg)](https://shields.io/)
- [![Generic badge](https://img.shields.io/badge/AlmaLinux%209-Passing-green.svg)](https://shields.io/)
-
- [![Generic badge](https://img.shields.io/badge/AmazonLinux%202-Passing-green.svg)](https://shields.io/)
- [![Generic badge](https://img.shields.io/badge/AmazonLinux%202023-Passing-green.svg)](https://shields.io/)
-
-## Ubuntu
-
-[![Generic badge](https://img.shields.io/badge/Ubuntu%2018.04-Passing-green.svg)](https://shields.io/) [![Generic badge](https://img.shields.io/badge/Ubuntu%2020.04-Passing-green.svg)](https://shields.io/) [![Generic badge](https://img.shields.io/badge/Ubuntu%2022.04-Passing-green.svg)](https://shields.io/)
-
-## Debian
-
-[![Generic badge](https://img.shields.io/badge/Debian%2012-Passing-green.svg)](https://shields.io/)
-
-## Bitnami (apache)
-
-[![Generic badge](https://img.shields.io/badge/Bitnami%20apache-Passing-green.svg)](https://shields.io/)
-
-## Gentoo
-
-[![Generic badge](https://img.shields.io/badge/Gentoo-Unable%20To%20Test-red.svg)](https://shields.io/)
-[![Generic badge](https://img.shields.io/badge/Gentoo-Works%20with%20dash%20O%20Option-yellow.svg)](https://shields.io/)
-[![Generic badge](https://img.shields.io/badge/Gentoo-Passing%20in%20the%20wild-green.svg)](https://shields.io/)
-
-
-The rule of thumb is if its not listed, its not supported.
-Anything that says Unable To Test, means it  should work, but can't be dockerized and isnt included in the Jenkinsfile for licensing reasons, and needs field testing. Badges for those items will be updated to "Passing in the wild" if seen working in the wild.
-
-# execution
-
-	# curl -sL https://raw.githubusercontent.com/richardforth/apache2buddy/master/apache2buddy.pl | perl
-
-
-# Best Practice
-        
-Best Practice is to check the code against either the md5sums or sha256sums (or both) before execution of the code.
-
-Example:
+### Dependencias del Sistema
+Apache2buddy.py requiere las siguientes herramientas del sistema:
 
 ```bash
-#!/bin/bash
-# example of testing md5sums prior to execution
+# Herramientas básicas
+- python3 (3.5+)
+- procps (ps, pmap)
+- net-tools (netstat) o iproute2 (ss)
+- curl
+- grep, awk, sed
+- hostname
+- findutils
 
-scriptmd5sum=`curl -sL https://raw.githubusercontent.com/richardforth/apache2buddy/master/apache2buddy.pl | md5sum | cut -d " " -f1`
-originmd5sum=`curl -s https://raw.githubusercontent.com/richardforth/apache2buddy/master/md5sums.txt | cut -d " " -f1`
-echo $scriptmd5sum
-echo $originmd5sum
-if [ $scriptmd5sum == $originmd5sum ]
-then
-        scriptsha256sum=`curl -sL https://raw.githubusercontent.com/richardforth/apache2buddy/master/apache2buddy.pl | sha256sum | cut -d " " -f1`
-        originsha256sum=`curl -s https://raw.githubusercontent.com/richardforth/apache2buddy/master/sha256sums.txt | cut -d " " -f1`
-        echo $scriptsha256sum
-        echo $originsha256sum
-        if [ $scriptsha256sum == $originsha256sum ]
-        then
-                # execute the code, its safe - we can assume
-                curl -sL https://raw.githubusercontent.com/richardforth/apache2buddy/master/apache2buddy.pl | perl
-		if [[ $? != 0 ]]; then
-			exit 1
-		fi
-        else
-                echo "Error: SHA256SUM mismatch, execution aborted."
-		exit 1
-        fi
-else
-        echo "Error: MD5SUM mismatch, execution aborted."
-	exit 1
-fi
+# Para análisis completo
+- php (opcional, para análisis de PHP)
+```
+## 🚀 Ejecución
+
+```bash
+# Conectar al pod
+kubectl exec -it <pod-name> -- bash
+
+# Instalar dependencias
+apt-get update
+apt-get install -y python3 procps net-tools curl grep hostname findutils util-linux psmisc apache2-utils
+
+# Copiar y ejecutar script
+python3 apache2buddy.py --skip-os-version-check -p 8080
 ```
 
-If the md5sums or sha256sums do not match, then changes have been made and its untested, so do not proceed until they match.
+### Opciones de ejecución recomendadas
+- `-p, --port`: Puerto donde escucha Apache (ej. `-p 8080`).
+- `-v, --verbose`: Salida detallada para diagnóstico.
+- `-O, --skip-os-version-check`: Omite validación estricta de versión de SO (útil en contenedores).
+- `--skip-maxclients`: Omite chequeo de “MaxClients/MaxRequestWorkers hits” en logs.
+- `--skip-php-fatal`: Omite escaneo de errores fatales de PHP en logs.
+- `--noheader --noinfo --nowarn --no-ok`: Modos silenciosos útiles para CI.
 
-# Risk Factors
+Ejemplos:
+```bash
+# Modo estándar en contenedor (recomendado)
+python3 apache2buddy.py -p 8080 -v -O --skip-php-fatal
 
-- Running arbitrary code as root (Dangerous)
-- Compromised script could result in root level compromise of your server
-- Runaway processes doing not what they are supposed to (this actually happened in testing, thankfully all of the known exceptions have been caught)
+# Modo más rápido evitando escaneos de logs
+python3 apache2buddy.py -p 8080 -O --skip-maxclients --skip-php-fatal
 
-
-# Logging
-
-On every execution, an entry is made in a log file: /var/log/apache2buddy.log on your server.
-
-Example log line:
-
-        2016/05/24 10:14:15 Model: "Prefork" Memory: "490 MB" Maxclients: "50" Recommended: "54" Smallest: "8.49 MB" Avg: "8.49 MB" Largest: "8.49 MB" Highest Pct Remaining RAM: "91.84%" (86.64% TOTAL RAM)
-
-
-This is to help you get an idea of changes over time to your apache tuning requirements. Maybe this will help you decide when you need more RAM, or when you need to start streamlining your code. Tracking when performace started degrading.
-
-Remember it only puts a new entry in the log file on each new execution. Its not designed to be run as a cron job or anything.
-
-# Log Rotation
-
-Log rotation should not be necessary because this script is NOT designed to be run as a cron job so it should never really fill your disks, if you ran this on your server a year or six months ago, maybe its just nice to see what the results were from back then? You get the idea.
-
+# Modo reporte (silencioso)
+python3 apache2buddy.py --report -p 8080 -O
+```
